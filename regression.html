@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+        <script src="http://d3js.org/d3.v3.js"></script>
+        <script src="https://npmcdn.com/simple-statistics@2.0.0-beta3/dist/simple-statistics.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.4/lodash.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.15.0/moment.min.js"></script>
+        
+  <style>
+    body {
+      font: 10px sans-serif;
+      /*background: black;*/
+      color:white;
+    }
+
+    .square {
+        width: 10px;
+        height: 10px;
+        margin-right: 10px;
+        float: left;
+    }
+    .cblue{
+        background: blue;
+    }
+
+    .caqua{
+        background: aqua;
+    }
+
+    .cgrey{
+        background: grey;
+    }
+
+    .corange{
+        background: orange;
+    }
+
+    .legend{
+        color: white;
+    }
+    
+    .axis path,
+    .axis line {
+      fill: none;
+      stroke: #000;
+      shape-rendering: crispEdges;
+      color: white;
+    }
+    
+    .x.axis path {
+      display: none;
+    }
+    
+    /*.line {
+      fill: none;
+      stroke: steelblue;
+      stroke-width: 1.5px;
+    }*/
+    .line {                         
+        fill: none;                 
+        stroke: url(#line-gradient);    
+        stroke-width: 2px;          
+    }
+
+    .secondline{                         
+        fill: none;                 
+        stroke:'yellow';    
+        stroke-width: 2px;          
+    }
+
+  </style>
+</head>
+
+<body>
+    <script>
+
+      var demo = true;
+      var myData = [];
+
+      if(demo)
+      {
+        myData = [
+        {
+            set1:72.2,
+            set2:75.2,
+            date:"20111001"
+        },
+        {
+            set1:68.7,
+            set2:71.2,
+            date:"20111002"
+        },
+        {
+            set1:69.4,
+            set2:70.2,
+            date:"20111003"
+        },
+        {
+            set1:75.2,
+            set2:69.2,
+            date:"20111004"
+        },
+        {
+            set1:71.2,
+            set2:68.2,
+            date:"20111005"
+        },
+        {
+            set1:74.2,
+            set2:73.2,
+            date:"20111006"
+        }
+    ]
+        
+      }else{
+
+        myData = [
+        {
+            set1:72.2,
+            date:"20111001"
+        },
+        {
+            set1:68.7,
+            date:"20111002"
+        },
+        {
+            set1:69.4,
+            date:"20111003"
+        },
+        {
+            set1:75.2,
+            date:"20111004"
+        },
+        {
+            set1:71.2,
+            date:"20111005"
+        },
+        {
+            set1:74.2,
+            date:"20111006"
+        }
+    ]
+
+      }
+    
+
+
+
+
+    var margin = {
+        top: 20,
+        right: 80,
+        bottom: 30,
+        left: 50
+      },
+      width = 900 - margin.left - margin.right,
+      height = 500 - margin.top - margin.bottom;
+
+    var parseDate = d3.time.format("%Y%m%d").parse;
+
+    var x = d3.time.scale()
+      .range([0, width]);
+
+    var y = d3.scale.linear()
+      .range([height, 0]);
+
+    var color = d3.scale.category10();
+
+    var xAxis = d3.svg.axis()
+      .scale(x)
+      .orient("bottom");
+
+    var yAxis = d3.svg.axis()
+      .scale(y)
+      .orient("left");
+
+    var line = d3.svg.line()
+      .interpolate("linear")
+      .x(function(d) {
+        return x(d.date);
+      })
+      .y(function(d) {
+        return y(d.temperature);
+      });
+
+    var svg = d3.select("body").append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    //var data = d3.tsv.parse(myData);
+    var data = myData;
+    color.domain(d3.keys(data[0]).filter(function(key) {
+      return key !== "date";
+    }));
+
+
+    data.forEach(function(d) {
+      d.date = parseDate(d.date);
+    });
+
+    var cities = color.domain().map(function(name) {
+      return {
+        name: name,
+        values: data.map(function(d) {
+          return {
+            date: d.date,
+            temperature: +d[name]
+          };
+        })
+      };
+    });
+
+    x.domain(d3.extent(data, function(d) {
+      return d.date;
+    }));
+
+    y.domain([
+      d3.min(cities, function(c) {
+        return d3.min(c.values, function(v) {
+          return v.temperature;
+        });
+      }),
+      d3.max(cities, function(c) {
+        return d3.max(c.values, function(v) {
+          return v.temperature;
+        });
+      })
+    ]);
+
+   var listArray =[];
+   cities.forEach(
+       (d)=>{
+           var list = d.values;
+           listArray = listArray.concat(list);
+       }
+   )
+
+   var regression = ss.linearRegression(listArray.map(function(d) {
+    return [+d.date, d.temperature];
+  }));
+
+  
+  var lin = ss.linearRegressionLine(regression);
+
+  // Create a line based on the beginning and endpoints of the range
+  var lindata = x.domain().map(function(x) {
+    return {
+      date: new Date(x),
+      temperature: lin(+x)
+    };
+  });
+
+    data.forEach(function(d) {
+      d.rec = findYatX(d.date,lindata); 
+    });
+
+    color.domain(d3.keys(data[0]).filter(function(key) {
+      return key !== "date";
+    }));
+
+    cities = color.domain().map(function(name) {
+      return {
+        name: name,
+        values: data.map(function(d) {
+          return {
+            date: d.date,
+            temperature: +d[name]
+          };
+        })
+      };
+    });
+
+    x.domain(d3.extent(data, function(d) {
+      return d.date;
+    }));
+
+    y.domain([
+      d3.min(cities, function(c) {
+        return d3.min(c.values, function(v) {
+          return v.temperature;
+        });
+      }),
+      d3.max(cities, function(c) {
+        return d3.max(c.values, function(v) {
+          return v.temperature;
+        });
+      })
+    ]);
+
+    svg.append("linearGradient")                
+    .attr("id", "line-gradient")            
+    .attr("gradientUnits", "userSpaceOnUse")    
+    .attr("x1", 0).attr("y1", y(0))         
+    .attr("x2", 1000).attr("y2", y(0))      
+  .selectAll("stop")                        
+    .data([                             
+      {offset: "0%", color: "blue"},        
+      {offset: "45%", color: "blue"},   
+      {offset: "45%", color: "Aqua"},       
+      {offset: "100%", color: "Aqua"}
+    ])                  
+  .enter().append("stop")           
+    .attr("offset", function(d) { return d.offset; })   
+    .attr("stop-color", function(d) { return d.color; });
+
+    var legenditem = demo? '<p><div class="square corange"></div> set2</p>':'';
+
+    var legendhtml = d3.select('body')
+        .append('div')
+        .attr('class', 'legendhtml')
+        .html(  '<p><div class="square cblue"></div> set1</p>'+legenditem+
+                '<p><div class="square caqua"></div> set1 Over</p>'+  
+                '<p><div class="square cgrey"></div> rec</p>')
+        .style('border', '1px solid white')
+        .style('padding', '5px')
+        .style('position', 'absolute')
+        .style('background','white')
+        .style('color','grey')
+        .style('display', 'block')
+        .style('top','0px')
+        .style('left','820px');
+            
+
+    var tip = d3.select('body')
+        .append('div')
+        .attr('class', 'tip')
+        .html('I am a tooltip...')
+        .style('border', '1px solid white')
+        .style('padding', '5px')
+        .style('position', 'absolute')
+        .style('background','black')
+        .style('color','white')
+        .style('display', 'none');
+
+    /*var legend = svg.selectAll('g')
+      .data(cities)
+      .enter()
+      .append('g')
+      .attr('class', 'legend');
+
+    legend.append('rect')
+      .attr('x', width - 20)
+      .attr('y', function(d, i) {
+        return i * 20;
+      })
+      .attr('width', 10)
+      .attr('height', 10)
+      .style('fill', function(d) {
+        return color(d.name);
+      });
+
+    legend.append('text')
+      .attr('x', width - 8)
+      .attr('y', function(d, i) {
+        return (i * 20) + 9;
+      })
+      .text(function(d) {
+        return d.name;
+      });*/
+
+      
+
+    svg.append("g")
+      .attr("class", "x axis")
+      .attr("transform", "translate(0," + height + ")")
+      .call(xAxis);
+
+    svg.append("g")
+      .attr("class", "y axis")
+      .call(yAxis)
+      .append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("y", 6)
+      .attr("dy", ".71em")
+      .style("text-anchor", "end")
+      .text("Index (%)");
+
+    var city = svg.selectAll(".city")
+      .data(cities)
+      .enter().append("g")
+      .attr("class", "city");
+
+
+
+    var regresion_line =  city.append("path")
+      .attr("class","line")//(d)=> {
+        /*console.log('Name',d.name);
+        if(d.name === 'set2'){
+            return 'secondline';
+        }else{
+          return 'line'
+        }*/
+      //})
+      .attr("d",(d)=> {
+        //if(d.name === 'rec'){
+            return line(d.values);
+        //}
+      })
+      .style("stroke", (d) => {
+        if(d.name === 'rec'){
+            return 'grey';
+        }
+        if(d.name === 'set2'){
+            return 'orange';
+        }
+      })
+      .style("stroke-dasharray", (d) => {
+        if(d.name === 'rec'){
+            return "5, 5" ;
+        }
+      });
+
+    /*var first_line = city.append("path")
+      .attr("class", "line")
+      .attr("d", function(d) {
+        if(d.name !== 'rec'){
+            var list_values = d.values;
+            var limit_date = parseDate('20111004')
+            var filter_list = list_values.filter( (c) => {
+                return c.date <= limit_date;
+            });
+            return line(filter_list);
+        }
+      })
+      .style("stroke", (d) => {
+            return 'blue';        
+      })
+      .style("stroke-dasharray", (d) => {
+            return "0";
+      });
+
+      var second_line = city.append("path")
+      .attr("class", "line")
+      .attr("d", function(d) {
+        if(d.name !== 'rec'){
+            var list_values = d.values;
+            var limit_date = parseDate('20111004')
+            //limit_date = moment(limit_date).format('dddd MMMM D Y');
+            var filter_list = list_values.filter( (c) => {
+                return c.date >= limit_date;
+            });
+            return line(filter_list);
+        }
+      })
+      .style("stroke", (d) => {
+          if(d.name == 'set1'){
+              return 'red';
+          }
+        
+      })
+      .style("stroke-dasharray", (d) => {
+            return "0";
+      });
+    */
+      
+    city.append("text")
+      .datum(function(d) {
+        return {
+          name: d.name,
+          value: d.values[d.values.length - 1]
+        };
+      })
+      .attr("transform", function(d) {
+        return "translate(" + x(d.value.date) + "," + y(d.value.temperature) + ")";
+      })
+      .attr("x", 3)
+      .attr("dy", ".35em")
+      .text(function(d) {
+        return d.name;
+      });
+
+    var mouseG = svg.append("g")
+      .attr("class", "mouse-over-effects");
+
+    mouseG.append("path") // this is the black vertical line to follow mouse
+      .attr("class", "mouse-line")
+      .style("stroke", "blue")
+      .style("stroke-dasharray","5,5")
+      .style("stroke-width", "1px")
+      .style("opacity", "0");
+
+      
+    var lines = document.getElementsByClassName('line');
+
+    var mousePerLine = mouseG.selectAll('.mouse-per-line')
+      .data(cities)
+      .enter()
+      .append("g")
+      .attr("class", "mouse-per-line");
+
+    mousePerLine.append("circle")
+      .attr("r", 8)
+      .style("stroke",(d) => {
+        if(d.name == 'rec'){
+              return "grey" ;
+          }else{
+            return color(d.name)
+          }
+      })
+      .style("fill", "none")
+      .style("stroke-width", "1px")
+      .style("opacity", "0")
+
+    mousePerLine.append("text")
+      .attr("transform", "translate(10,3)");
+
+    mouseG.append('svg:rect') // append a rect to catch mouse movements on canvas
+      .attr('width', width) // can't catch mouse events on a g element
+      .attr('height', height)
+      .attr('fill', 'none')
+      .attr('pointer-events', 'all')
+      .on('mouseout', function() { // on mouse out hide line, circles and text
+        d3.select(".mouse-line")
+          .style("opacity", "0");
+        d3.selectAll(".mouse-per-line circle")
+          .style("opacity", "0");
+        d3.selectAll(".mouse-per-line text")
+          .style("opacity", "0");
+
+        tip.style('display', 'none');
+      })
+      .on('mouseover', function() { // on mouse in show line, circles and text
+        d3.select(".mouse-line")
+          .style("opacity", "1");
+        d3.selectAll(".mouse-per-line circle")
+          .style("opacity", "1");
+        d3.selectAll(".mouse-per-line text")
+          .style("opacity", "1");
+
+        tip.style('display', 'block');
+      })
+      .on('mousemove', function() { // mouse moving over canvas
+        var mouse = d3.mouse(this);
+        d3.select(".mouse-line")
+          .attr("d", function() {
+            var d = "M" + mouse[0] + "," + height;
+            d += " " + mouse[0] + "," + 0;
+            return d;
+          });
+
+        d3.selectAll(".mouse-per-line")
+          .attr("transform", function(d, i) {
+
+            var xDate = x.invert(mouse[0]),
+                bisect = d3.bisector(function(d) { return d.date; }).right;
+                idx = bisect(d.values, xDate);
+            
+            var beginning = 0,
+                end = lines[i].getTotalLength(),
+                target = null;
+
+            while (true){
+              target = Math.floor((beginning + end) / 2);
+              pos = lines[i].getPointAtLength(target);
+              if ((target === end || target === beginning) && pos.x !== mouse[0]) {
+                  break;
+              }
+              if (pos.x > mouse[0])      end = target;
+              else if (pos.x < mouse[0]) beginning = target;
+              else break; //position found
+            }
+            
+            d3.select(this).select('text')
+              .text(y.invert(pos.y).toFixed(2));
+
+
+            var find_obj =  _.find(data, function(o) { 
+                var current_date = moment(o.date).format('dddd MMMM D Y');
+                var old_date = moment(xDate).format('dddd MMMM D Y')
+                return current_date === old_date; }
+            );
+
+            var left_margin = mouse[0] +110;
+            tip.transition().duration(0);
+            tip.style('top',pos.y - 20 + 'px');
+            tip.style('left',  left_margin + 'px');
+            tip.style('display', 'block');
+            tip.style('border-radius', '10px');
+            tip.html(   '<p>'+moment(xDate).format('dddd MMMM D Y')+
+                        '</p><p><div class="square cblue"></div> set1 '+find_obj.set1+'</p>'+
+                        '</p><p><div class="square cgrey"></div> rec '+(find_obj.rec).toFixed(2)+'</p>'
+                    );
+            return "translate(" + mouse[0] + "," + pos.y +")";
+          });
+      });
+
+function findYatX(x,data) {
+    var x1 = data[0].date;
+    var y1 = data[0].temperature;
+    var x2 = data[1].date;
+    var y2 = data[1].temperature;
+    var mod = (y2-y1)/(x2-x1);
+    var c = y1 - mod*x1;
+    return x * mod + c;
+}
+      
+  </script>
+</body>
+
+</html>
